@@ -18,6 +18,10 @@ public class PlayerMovement : MonoBehaviour
     [Tooltip("Assign the Spot Light here (optional). If left empty, the script will try to find a GameObject named 'Spot Light'.")]
     public Light spotLight;
     public string spotLightName = "Spot Light";
+
+    // Camera reference so movement follows camera look (W = forward of camera)
+    [Tooltip("Assign the player camera transform here. If left empty the script will use Camera.main.")]
+    public Transform cam;
  
     public Transform groundCheck;
     public float groundDistance = 0.4f;
@@ -37,6 +41,12 @@ public class PlayerMovement : MonoBehaviour
             {
                 spotLight = found.GetComponent<Light>();
             }
+        }
+
+        // If no camera assigned, try to use the main camera
+        if (cam == null && Camera.main != null)
+        {
+            cam = Camera.main.transform;
         }
     }
  
@@ -67,8 +77,22 @@ public class PlayerMovement : MonoBehaviour
         float x = Input.GetAxis("Horizontal");
         float z = Input.GetAxis("Vertical");
 
-        // right is the red Axis, forward is the blue axis
-        Vector3 move = transform.right * x + transform.forward * z;
+        // Movement relative to camera look: W moves toward camera forward (ignoring vertical tilt)
+        Vector3 right = Vector3.right;
+        Vector3 forward = Vector3.forward;
+
+        if (cam != null)
+        {
+            forward = cam.forward;
+            right = cam.right;
+            // ignore vertical component so movement stays on the XZ plane
+            forward.y = 0f;
+            right.y = 0f;
+            forward.Normalize();
+            right.Normalize();
+        }
+
+        Vector3 move = right * x + forward * z;
 
         // Sprint: hold Left Shift to temporarily add sprintAdd to speed
         float currentSpeed = speed;
