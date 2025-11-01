@@ -10,6 +10,7 @@ public class EnemyPatrol : MonoBehaviour
 
     public float speed = 2f;
     public float rotationSpeed = 5f; // Speed at which the enemy rotates to face target
+    public float lookTime;
 
     public float sightRange;
     public float sightRadius;
@@ -33,6 +34,10 @@ public class EnemyPatrol : MonoBehaviour
     private bool IsChasing()
     {
         return (Time.time - lastSeenTime) <= chaseMemoryDuration;
+    }
+
+    public bool getAggroStatus() {
+        return aggroed;
     }
     // Start is called before the first frame update
     void Start()
@@ -169,6 +174,50 @@ public class EnemyPatrol : MonoBehaviour
 
             // small pause before heading to next point
             yield return new WaitForSeconds(0.5f);
+
+            // surveying behavior - look left, right, then center
+            GameObject head = gameObject.GetComponentInChildren<Transform>().Find("Head")?.gameObject;
+            if (head != null)
+            {
+                // Look left
+                Quaternion originalRotation = head.transform.rotation;
+                Quaternion leftRotation = Quaternion.Euler(0, -45f, 0) * originalRotation;
+                float elapsedTime = 0;
+                
+                while (elapsedTime < lookTime)
+                {
+                    elapsedTime += Time.deltaTime;
+                    head.transform.rotation = Quaternion.Slerp(originalRotation, leftRotation, elapsedTime / lookTime);
+                    yield return null;
+                }
+
+                // Look right
+                Quaternion rightRotation = Quaternion.Euler(0, 45f, 0) * originalRotation;
+                elapsedTime = 0;
+                
+                while (elapsedTime < lookTime)
+                {
+                    elapsedTime += Time.deltaTime;
+                    head.transform.rotation = Quaternion.Slerp(leftRotation, rightRotation, elapsedTime / lookTime);
+                    yield return null;
+                }
+
+                // Return to center
+                elapsedTime = 0;
+                
+                while (elapsedTime < lookTime)
+                {
+                    elapsedTime += Time.deltaTime;
+                    head.transform.rotation = Quaternion.Slerp(rightRotation, originalRotation, elapsedTime / lookTime);
+                    yield return null;
+                }
+            }
+            else
+            {
+                Debug.LogWarning("EnemyPatrol: Could not find head object for surveying behavior.");
+            }
+
+            yield return new WaitForSeconds(0.5f);
         }
     }
 
@@ -183,8 +232,10 @@ public class EnemyPatrol : MonoBehaviour
                 target = player.transform.position;
             }
 
-            transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(-(target - transform.position).normalized), rotationSpeed * Time.deltaTime);
-            transform.position = Vector3.MoveTowards(transform.position, target, (speed * 2) * Time.deltaTime);
+            Vector3 directionToTarget = modelForwardIsBackwards ? -(target - transform.position).normalized : (target - transform.position).normalized;
+
+            transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(directionToTarget), rotationSpeed * Time.deltaTime);
+            transform.position = Vector3.MoveTowards(transform.position, target, (speed * 4) * Time.deltaTime);
             Debug.Log("chasing player/last seen");
             yield return null;
         }
@@ -194,6 +245,16 @@ public class EnemyPatrol : MonoBehaviour
     {
         // Use the same facing direction as the SphereCast
         Vector3 facingDirection = modelForwardIsBackwards ? -transform.forward : transform.forward;
+        
+        // Draw forward direction indicator
+        Gizmos.color = Color.blue;
+        Vector3 modelFront = transform.position + (facingDirection * 2f); // 2 unit length arrow
+        Gizmos.DrawLine(transform.position, modelFront);
+        // Draw arrow head
+        Vector3 arrowRight = transform.right * 0.5f;
+        Vector3 arrowBase = modelFront - facingDirection * 0.5f;
+        Gizmos.DrawLine(modelFront, arrowBase + arrowRight);
+        Gizmos.DrawLine(modelFront, arrowBase - arrowRight);
         
         // Draw sight range visualization
         Gizmos.color = aggroed ? Color.red : Color.yellow; // Red when player detected, yellow otherwise
