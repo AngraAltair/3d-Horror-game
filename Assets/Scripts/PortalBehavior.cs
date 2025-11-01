@@ -19,6 +19,7 @@ public class PortalBehavior : MonoBehaviour
     void OnTriggerEnter(Collider other) {
         if (other.CompareTag("Player")) {
             Debug.Log("Player entered the portal!");
+            UnityEngine.SceneManagement.SceneManager.LoadScene("LevelComplete");
             // Add portal behavior here
         }
     }
